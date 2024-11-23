@@ -1,12 +1,12 @@
 use crate::util::{le_u8s_to_u32s, u32s_to_le_u8s};
 use std::simd::Simd;
 /// Encrypts a plaintext using the ChaCha20 algorithm
-/// 
+///
 /// The ChaCha20 algorithm generates a keystream the length of at least the plaintext, then XOR's it
 /// with the plaintext. If the plaintext is not a multiple of 64 bytes, the keystream is truncated.
 ///
 /// This is the vectorized version of the algorithm. For the iterative version, see [`crate::algo`].
-/// 
+///
 /// ## Parameters
 ///
 /// - `plaintext`: The plaintext bytes to encrypt
@@ -35,14 +35,17 @@ use std::simd::Simd;
 /// ];
 ///
 /// let ciphertext = encrypt(plaintext, &key, &nonce);
-/// 
+///
 /// let decrypted = encrypt(&ciphertext, &key, &nonce);
 ///
 /// assert_eq!(decrypted, plaintext);
 /// ```
 pub fn encrypt(plaintext: &[u8], key: &[u8; 32], nonce: &[u8; 12]) -> Vec<u8> {
+    let key: [u32; 8] = le_u8s_to_u32s(key);
+    let nonce: [u32; 3] = le_u8s_to_u32s(nonce);
+
     let key_stream = (1..=(plaintext.len() / 64 + 1) as u32)
-        .map(|i| ChaCha20::new(key, nonce, i).gen_key_stream())
+        .map(|i| ChaCha20::new(&key, &nonce, i).gen_key_stream())
         .flat_map(|words| u32s_to_le_u8s::<64>(&words));
 
     plaintext
@@ -53,9 +56,9 @@ pub fn encrypt(plaintext: &[u8], key: &[u8; 32], nonce: &[u8; 12]) -> Vec<u8> {
 }
 
 /// Data type to encapsulate the ChaCha20 SIMD buffers
-/// 
+///
 /// Rather than treat the state as a 16 element array of u32's, we load each row into a SIMD buffer.
-/// 
+///
 /// Column-wise operations are performed by using the traits implemented on the SIMD type. To handle
 /// operations on the diagonals, we transform the state by doing element-wise left-rotation before
 /// the diagonal quarter-rounds, then right-rotation after.
@@ -69,43 +72,40 @@ pub struct ChaCha20 {
 
 impl ChaCha20 {
     /// Creates a new ChaCha20 instance
-    /// 
+    ///
     /// ## Parameters
-    /// 
+    ///
     /// - `key`: The 256-bit key
     /// - `nonce`: The 96-bit nonce
     /// - `block_count`: The block count
-    /// 
+    ///
     /// ## Returns
-    /// 
+    ///
     /// A new ChaCha20 instance with the initial state
-    /// 
+    ///
     /// ## Example
-    /// 
+    ///
     /// ```rust
     /// use chacha20::simd::ChaCha20;
-    /// 
+    ///
     /// let key: [u32; 8] = [
     ///     0x03020100, 0x07060504, 0x0b0a0908, 0x0f0e0d0c, 0x13121110, 0x17161514, 0x1b1a1918,
     ///     0x1f1e1d1c,
     /// ];
-    /// 
+    ///
     /// let nonce: [u32; 3] = [0x00000001, 0x00000000, 0x4a000000];
-    /// 
+    ///
     /// let block_count: u32 = 1;
-    /// 
+    ///
     /// let state = [
     ///     0x61707865, 0x3320646e, 0x79622d32, 0x6b206574, 0x03020100, 0x07060504, 0x0b0a0908,
     ///     0x0f0e0d0c, 0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c, 0x00000001, 0x00000001,
     ///     0x00000000, 0x4a000000
     /// ];
-    /// 
+    ///
     /// let chacha = ChaCha20::new(&key, &nonce, block_count);
     /// ```
-    pub fn new(key: &[u8; 32], nonce: &[u8; 12], block_count: u32) -> Self {
-        let key: [u32; 8] = le_u8s_to_u32s(key);
-        let nonce: [u32; 3] = le_u8s_to_u32s(nonce);
-
+    pub fn new(key: &[u32; 8], nonce: &[u32; 3], block_count: u32) -> Self {
         Self {
             a: Simd::from([0x61707865, 0x3320646e, 0x79622d32, 0x6b206574]),
             b: Simd::from([key[0], key[1], key[2], key[3]]),
@@ -115,39 +115,43 @@ impl ChaCha20 {
     }
 
     /// Generates the key stream using the ChaCha20 algorithm.
-    /// 
+    ///
     /// All inputs are in state, so no external parameters are necessary. Since all columns are
     /// computed independently, we can use SIMD to parallelize these operations.
-    /// 
+    ///
     /// ## Returns
-    /// 
+    ///
     /// The key stream as a 16-element array of u32's
-    /// 
+    ///
     /// ## Example
-    /// 
+    ///
     /// ```rust
     /// use chacha20::simd::ChaCha20;
-    /// 
+    /// use chacha20::util::le_u8s_to_u32s;
+    ///
     /// let key: [u8; 32] = [
     ///     0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d,
     ///     0x0e, 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18, 0x19, 0x1a, 0x1b,
     ///     0x1c, 0x1d, 0x1e, 0x1f,
     /// ];
-    /// 
+    ///
     /// let nonce: [u8; 12] = [
     ///     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x01,
     /// ];
-    /// 
+    ///
     /// let block_count: u32 = 1;
-    /// 
+    ///
     /// let key_stream = [
     ///     0x7c66869a, 0xb3f915d2, 0xca238319, 0x974c554a, 0xf2bb0a6b, 0xab028b9c, 0xcf878654,
     ///     0x19b185da, 0xf275298b, 0x67092355, 0x9d0650f9, 0xa861070b, 0x70d35dd8, 0xeca9486a,
     ///     0xe2c3fe4d, 0xf0ad6108
     /// ];
-    /// 
-    /// let chacha = ChaCha20::new(&key, &nonce, block_count);
-    /// 
+    ///
+    /// let key_u32s = le_u8s_to_u32s(&key);
+    /// let nonce_u32s = le_u8s_to_u32s(&nonce);
+    ///
+    /// let chacha = ChaCha20::new(&key_u32s, &nonce_u32s, block_count);
+    ///
     /// assert_eq!(chacha.gen_key_stream(), key_stream);
     /// ```
     pub fn gen_key_stream(&self) -> [u32; 16] {
@@ -182,11 +186,11 @@ impl ChaCha20 {
         .try_into()
         .unwrap()
     }
-    
+
     /// Performs a quarter round on the state.
-    /// 
+    ///
     /// The quarter round is the core operation of the ChaCha20 algorithm.
-    /// 
+    ///
     /// > Note: The function mutates the state in-place.
     #[inline(always)]
     fn quarter_round(&mut self) {
@@ -208,19 +212,19 @@ impl ChaCha20 {
     }
 
     /// Rotates the bits in each element of a SIMD buffer to the left by a given amount.
-    /// 
+    ///
     /// While `u32::rotate_left` is not available in SIMD buffers, we can achieve the same effect by
     /// shifting the elements in opposite directions and then OR'ing them together.
-    /// 
+    ///
     /// > Note: The SIMD type "splats" the shift amount across all elements.
-    /// 
+    ///
     /// ## Parameters
-    /// 
+    ///
     /// - `a`: The SIMD buffer to rotate
     /// - `b`: The amount by which to rotate
-    /// 
+    ///
     /// ## Returns
-    /// 
+    ///
     /// The rotated SIMD buffer
     #[inline(always)]
     fn rotl(a: Simd<u32, 4>, b: u32) -> Simd<u32, 4> {
@@ -276,7 +280,10 @@ mod tests {
             0xe883d0cb, 0x4e3c50a2,
         ];
 
-        let chacha = ChaCha20::new(&key, &nonce, block_count);
+        let key_u32s = le_u8s_to_u32s(&key);
+        let nonce_u32s = le_u8s_to_u32s(&nonce);
+
+        let chacha = ChaCha20::new(&key_u32s, &nonce_u32s, block_count);
 
         assert_eq!(chacha.gen_key_stream(), expected);
     }
@@ -329,12 +336,15 @@ mod tests {
             0x87, 0x4d,
         ];
 
+        let key_u32s = le_u8s_to_u32s(&key);
+        let nonce_u32s = le_u8s_to_u32s(&nonce);
+
         assert_eq!(
-            ChaCha20::new(&key, &nonce, 1).gen_key_stream(),
+            ChaCha20::new(&key_u32s, &nonce_u32s, 1).gen_key_stream(),
             first_block_expected
         );
         assert_eq!(
-            ChaCha20::new(&key, &nonce, 2).gen_key_stream(),
+            ChaCha20::new(&key_u32s, &nonce_u32s, 2).gen_key_stream(),
             second_block_expected
         );
         assert_eq!(
