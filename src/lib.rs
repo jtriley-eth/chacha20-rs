@@ -11,7 +11,7 @@
 //! This implementation does not include a MAC and without it, is susceptible to bit-flipping
 //! attacks.
 //!
-//! As is recommended in [RFC-7539](https://datatracker.ietf.org/doc/html/rfc7539), Poly1205 is a
+//! As is recommended in [RFC-7539](https://datatracker.ietf.org/doc/html/rfc7539), Poly1305 is a
 //! common and recommended MAC to use in tandem with ChaCha20.
 
 pub mod algo;
