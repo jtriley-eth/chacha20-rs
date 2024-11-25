@@ -5,7 +5,9 @@ use std::simd::Simd;
 /// The ChaCha20 algorithm generates a keystream the length of at least the plaintext, then XOR's it
 /// with the plaintext. If the plaintext is not a multiple of 64 bytes, the keystream is truncated.
 ///
-/// This is the vectorized version of the algorithm. For the iterative version, see [`crate::algo`].
+/// This is the 128-bit vectorized version of the algorithm, it requires the AVX-2 extension to x86.
+/// For the iterative version, see [`crate::algo`], for the quad-SIMD version, see
+/// [`crate::quad_simd`].
 ///
 /// ## Parameters
 ///
