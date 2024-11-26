@@ -103,43 +103,26 @@ impl ChaCha20 {
     /// let chacha = ChaCha20::new(&key, &nonce, start_block_count);
     /// ```
     pub fn new(key: &[u32; 8], nonce: &[u32; 3], start_block_count: u32) -> Self {
+        const BLOCK_COUNT_OFFSETS: Simd<u32, 16> =
+            Simd::from_array([0, 0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0]);
+
         Self {
-            a: Simd::from([
-                0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,
-                0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,
-                0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,
-                0x61707865, 0x3320646e, 0x79622d32, 0x6b206574,
-            ]),
-            b: Simd::from([
-                key[0], key[1], key[2], key[3],
-                key[0], key[1], key[2], key[3],
-                key[0], key[1], key[2], key[3],
-                key[0], key[1], key[2], key[3],
-            ]),
-            c: Simd::from([
-                key[4], key[5], key[6], key[7],
-                key[4], key[5], key[6], key[7],
-                key[4], key[5], key[6], key[7],
-                key[4], key[5], key[6], key[7],
-            ]),
-            d: Simd::from([
-                start_block_count,
-                nonce[0],
-                nonce[1],
-                nonce[2],
-                start_block_count + 1,
-                nonce[0],
-                nonce[1],
-                nonce[2],
-                start_block_count + 2,
-                nonce[0],
-                nonce[1],
-                nonce[2],
-                start_block_count + 3,
-                nonce[0],
-                nonce[1],
-                nonce[2],
-            ]),
+            a: simd_swizzle!(
+                Simd::from([0x61707865, 0x3320646e, 0x79622d32, 0x6b206574]),
+                [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
+            ),
+            b: simd_swizzle!(
+                Simd::from([key[0], key[1], key[2], key[3]]),
+                [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
+            ),
+            c: simd_swizzle!(
+                Simd::from([key[4], key[5], key[6], key[7]]),
+                [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
+            ),
+            d: simd_swizzle!(
+                Simd::from([start_block_count, nonce[0], nonce[1], nonce[2]]),
+                [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
+            ) + BLOCK_COUNT_OFFSETS,
         }
     }
 
@@ -169,9 +152,9 @@ impl ChaCha20 {
     /// ];
     ///
     /// let start_block_count: u32 = 1;
-    /// 
+    ///
     /// let key_u32s = le_u8s_to_u32s(&key);
-    /// 
+    ///
     /// let nonce_u32s = le_u8s_to_u32s(&nonce);
     ///
     /// let chacha = ChaCha20::new(&key_u32s, &nonce_u32s, start_block_count);
@@ -189,15 +172,15 @@ impl ChaCha20 {
             working_state.swizzle_right();
         }
 
-        working_state.a += self.a;
-        working_state.b += self.b;
-        working_state.c += self.c;
-        working_state.d += self.d;
+        // working_state.a += self.a;
+        // working_state.b += self.b;
+        // working_state.c += self.c;
+        // working_state.d += self.d;
 
-        let a = working_state.a.to_array();
-        let b = working_state.b.to_array();
-        let c = working_state.c.to_array();
-        let d = working_state.d.to_array();
+        let a = working_state.a + self.a;
+        let b = working_state.b + self.b;
+        let c = working_state.c + self.c;
+        let d = working_state.d + self.d;
 
         [
             a[00], a[01], a[02], a[03], b[00], b[01], b[02], b[03], c[00], c[01], c[02], c[03],
@@ -231,9 +214,18 @@ impl ChaCha20 {
     /// ```
     #[inline(always)]
     fn swizzle_left(&mut self) {
-        self.b = simd_swizzle!(self.b, [1, 2, 3, 0, 5, 6, 7, 4, 9, 10, 11, 8, 13, 14, 15, 12]);
-        self.c = simd_swizzle!(self.c, [2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13]);
-        self.d = simd_swizzle!(self.d, [3, 0, 1, 2, 7, 4, 5, 6, 11, 8, 9, 10, 15, 12, 13, 14]);
+        self.b = simd_swizzle!(
+            self.b,
+            [1, 2, 3, 0, 5, 6, 7, 4, 9, 10, 11, 8, 13, 14, 15, 12]
+        );
+        self.c = simd_swizzle!(
+            self.c,
+            [2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13]
+        );
+        self.d = simd_swizzle!(
+            self.d,
+            [3, 0, 1, 2, 7, 4, 5, 6, 11, 8, 9, 10, 15, 12, 13, 14]
+        );
     }
 
     /// Swizzles the state to the right
@@ -258,9 +250,18 @@ impl ChaCha20 {
     /// ```
     #[inline(always)]
     fn swizzle_right(&mut self) {
-        self.b = simd_swizzle!(self.b, [3, 0, 1, 2, 7, 4, 5, 6, 11, 8, 9, 10, 15, 12, 13, 14]);
-        self.c = simd_swizzle!(self.c, [2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13]);
-        self.d = simd_swizzle!(self.d, [1, 2, 3, 0, 5, 6, 7, 4, 9, 10, 11, 8, 13, 14, 15, 12]);
+        self.b = simd_swizzle!(
+            self.b,
+            [3, 0, 1, 2, 7, 4, 5, 6, 11, 8, 9, 10, 15, 12, 13, 14]
+        );
+        self.c = simd_swizzle!(
+            self.c,
+            [2, 3, 0, 1, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13]
+        );
+        self.d = simd_swizzle!(
+            self.d,
+            [1, 2, 3, 0, 5, 6, 7, 4, 9, 10, 11, 8, 13, 14, 15, 12]
+        );
     }
 
     /// Performs a quarter round on the state.
