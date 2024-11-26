@@ -164,13 +164,55 @@ impl ChaCha20 {
     pub fn gen_key_stream(&self) -> [u32; 64] {
         let mut working_state = self.clone();
 
-        for _ in 0..10 {
-            working_state.quarter_round();
-            working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
 
-            working_state.quarter_round();
-            working_state.swizzle_right();
-        }
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
+
+        working_state.quarter_round();
+        working_state.swizzle_left();
+        working_state.quarter_round();
+        working_state.swizzle_right();
 
         // working_state.a += self.a;
         // working_state.b += self.b;
