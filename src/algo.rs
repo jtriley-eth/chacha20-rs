@@ -32,17 +32,20 @@ use crate::util::{le_u8s_to_u32s, u32s_to_le_u8s};
 ///     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
 /// ];
 ///
-/// let ciphertext = encrypt(plaintext, &key, &nonce);
+/// let block_count: u32 = 1;
 ///
-/// let decrypted = encrypt(&ciphertext, &key, &nonce);
+/// let ciphertext = encrypt(plaintext, &key, &nonce, block_count);
+///
+/// let decrypted = encrypt(&ciphertext, &key, &nonce, block_count);
 ///
 /// assert_eq!(decrypted, plaintext);
 /// ```
-pub fn encrypt(plaintext: &[u8], key: &[u8; 32], nonce: &[u8; 12]) -> Vec<u8> {
+pub fn encrypt(plaintext: &[u8], key: &[u8; 32], nonce: &[u8; 12], block_count: u32) -> Vec<u8> {
     let key = le_u8s_to_u32s(key);
     let nonce = le_u8s_to_u32s(nonce);
+    let blocks = (plaintext.len() / 64) as u32 + block_count;
 
-    let key_stream = (1..=(plaintext.len() / 64 + 1) as u32)
+    let key_stream = (block_count..=blocks)
         .map(|i| gen_key_stream(&key, &nonce, i))
         .flat_map(|words| u32s_to_le_u8s::<64>(&words));
 
@@ -319,6 +322,8 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00,
         ];
 
+        let block_count: u32 = 1;
+
         let first_init_state_expected = [
             0x61707865, 0x3320646e, 0x79622d32, 0x6b206574, 0x03020100, 0x07060504, 0x0b0a0908,
             0x0f0e0d0c, 0x13121110, 0x17161514, 0x1b1a1918, 0x1f1e1d1c, 0x00000001, 0x00000000,
@@ -358,23 +363,23 @@ mod tests {
         let nonce_u32s = le_u8s_to_u32s(&nonce);
 
         assert_eq!(
-            init_state(&key_u32s, &nonce_u32s, 1),
+            init_state(&key_u32s, &nonce_u32s, block_count),
             first_init_state_expected
         );
         assert_eq!(
-            init_state(&key_u32s, &nonce_u32s, 2),
+            init_state(&key_u32s, &nonce_u32s, block_count + 1),
             second_init_state_expected
         );
         assert_eq!(
-            gen_key_stream(&key_u32s, &nonce_u32s, 1),
+            gen_key_stream(&key_u32s, &nonce_u32s, block_count),
             first_block_expected
         );
         assert_eq!(
-            gen_key_stream(&key_u32s, &nonce_u32s, 2),
+            gen_key_stream(&key_u32s, &nonce_u32s, block_count + 1),
             second_block_expected
         );
         assert_eq!(
-            encrypt(&plaintext, &key, &nonce),
+            encrypt(&plaintext, &key, &nonce, block_count),
             ciphertext_expected.to_vec()
         );
     }

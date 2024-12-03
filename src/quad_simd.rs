@@ -36,18 +36,20 @@ use std::simd::{simd_swizzle, Simd};
 ///     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
 /// ];
 ///
-/// let ciphertext = encrypt(plaintext, &key, &nonce);
+/// let block_count: u32 = 1;
 ///
-/// let decrypted = encrypt(&ciphertext, &key, &nonce);
+/// let ciphertext = encrypt(plaintext, &key, &nonce, block_count);
+///
+/// let decrypted = encrypt(&ciphertext, &key, &nonce, block_count);
 ///
 /// assert_eq!(decrypted, plaintext);
 /// ```
-pub fn encrypt(plaintext: &[u8], key: &[u8; 32], nonce: &[u8; 12]) -> Vec<u8> {
+pub fn encrypt(plaintext: &[u8], key: &[u8; 32], nonce: &[u8; 12], block_count: u32) -> Vec<u8> {
     let key: [u32; 8] = le_u8s_to_u32s(key);
     let nonce: [u32; 3] = le_u8s_to_u32s(nonce);
-    let blocks = plaintext.len() / 265 + 1;
+    let blocks = (plaintext.len() / 265) as u32 + block_count;
 
-    let key_stream = (1..=blocks as u32)
+    let key_stream = (block_count..=blocks)
         .map(|i| ChaCha20::new(&key, &nonce, i).gen_key_stream())
         .flat_map(|words| u32s_to_le_u8s::<256>(&words));
 
@@ -462,6 +464,8 @@ mod tests {
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x4a, 0x00, 0x00, 0x00, 0x00,
         ];
 
+        let block_count: u32 = 1;
+
         let ciphertext_expected = [
             0x6e, 0x2e, 0x35, 0x9a, 0x25, 0x68, 0xf9, 0x80, 0x41, 0xba, 0x07, 0x28, 0xdd, 0x0d,
             0x69, 0x81, 0xe9, 0x7e, 0x7a, 0xec, 0x1d, 0x43, 0x60, 0xc2, 0x0a, 0x27, 0xaf, 0xcc,
@@ -475,7 +479,7 @@ mod tests {
         ];
 
         assert_eq!(
-            encrypt(&plaintext, &key, &nonce),
+            encrypt(&plaintext, &key, &nonce, block_count),
             ciphertext_expected.to_vec()
         );
     }

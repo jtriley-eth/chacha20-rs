@@ -13,9 +13,9 @@
 //!
 //! As is recommended in [RFC-7539](https://datatracker.ietf.org/doc/html/rfc7539), Poly1305 is a
 //! common and recommended MAC to use in tandem with ChaCha20.
-//! 
+//!
 //! We implement three versions of the algorithm:
-//! 
+//!
 //! - [`algo`] is the iterative, simplest algorithm
 //! - [`simd`] is the iterative algorithm with SIMD support
 //! - [`quad_simd`] is quad-SIMD algorithm
