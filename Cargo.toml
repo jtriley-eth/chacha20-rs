@@ -3,12 +3,13 @@ name = "chacha20"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-
 [dev-dependencies]
-
-# benchmarking library
+# benchmarking
 criterion = { version = "0.5", features = ["html_reports"] }
+# property testing
+proptest = "1.5.0"
+# differential chacha20 implementation
+rust-crypto-chacha20 = { version = "0.9.1", package = "chacha20" }
 
 [[bench]]
 name = "mod"
